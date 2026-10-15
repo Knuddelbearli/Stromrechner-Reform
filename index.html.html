@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Strompreis-Vergleich</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--text:#1c2330;--muted:#667085;--line:#d9dde4;--acc:#1d6fe0;--good:#16803c;--bad:#b42318;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161d;--card:#1b212b;--text:#e8ecf2;--muted:#9aa4b2;--line:#2e3644;--acc:#5b9bff;--good:#4cc27a;--bad:#ff7b6e}}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px}
+main{max-width:760px;margin:0 auto}
+h1{font-size:1.4rem;margin:0 0 16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:620px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+h2{font-size:1rem;margin:0 0 12px}
+label{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 4px}
+input{width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px}
+input:focus{outline:2px solid var(--acc);outline-offset:0}
+input[readonly]{opacity:.8}
+.hint{font-size:.78rem;color:var(--muted);margin-top:10px}
+.res{margin-top:14px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}
+.big{font-size:1.5rem;font-weight:700}
+.save{text-align:center;padding:18px}
+.good{color:var(--good)}.bad{color:var(--bad)}
+</style>
+</head>
+<body>
+<main>
+<h1>⚡ Strompreis-Vergleich</h1>
+<div class="grid">
+  <section class="card">
+    <h2>Aktueller Tarif</h2>
+    <label for="a_preis">Preis (Cent pro kWh)</label>
+    <input id="a_preis" type="number" step="0.01" min="0" value="30" inputmode="decimal">
+    <label for="a_kwh">Verbrauch (kWh pro Jahr)</label>
+    <input id="a_kwh" type="number" step="1" min="0" value="5000" inputmode="decimal">
+    <label for="a_fix">Fixpreis (€ pro Jahr)</label>
+    <input id="a_fix" type="number" step="0.01" min="0" value="60" inputmode="decimal">
+  </section>
+  <section class="card">
+    <h2>Neuer Tarif</h2>
+    <label for="n_kw">Spitzenleistung (kW)</label>
+    <input id="n_kw" type="number" step="0.01" min="0" value="12" inputmode="decimal">
+    <label for="n_peak">Maximaler 15-Minuten-Verbrauch (kWh) – gekoppelt, nur eines von beiden eingeben</label>
+    <input id="n_peak" type="number" step="0.01" min="0" value="3" inputmode="decimal">
+    <label for="n_kwh">Verbrauch (kWh pro Jahr)</label>
+    <input id="n_kwh" type="number" step="1" min="0" value="5000" inputmode="decimal">
+    <div class="hint" id="kw"></div>
+  </section>
+</div>
+
+<section class="card res">
+  <div class="row"><span>Kosten aktuell (pro Monat)</span><strong id="r_alt_m"></strong></div>
+  <div class="row"><span>Kosten neu (pro Monat)</span><strong id="r_neu_m"></strong></div>
+  <div class="row"><span>&nbsp;&nbsp;davon Verbrauchskosten</span><span id="r_verb"></span></div>
+  <div class="row"><span>&nbsp;&nbsp;davon Spitzenkosten</span><span id="r_spitz"></span></div>
+  <div class="save"><div id="r_label" class="hint"></div><div id="r_diff" class="big"></div><div id="r_pct" class="hint"></div></div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const num=id=>{const v=parseFloat(String($(id).value).replace(',','.'));return isNaN(v)?0:v};
+const eur=v=>v.toLocaleString('de-AT',{style:'currency',currency:'EUR'});
+let touched=false;
+$('n_kwh').addEventListener('input',()=>{touched=true});
+function calc(){
+  if(!touched)$('n_kwh').value=$('a_kwh').value;
+  const aP=num('a_preis'),aK=num('a_kwh'),aF=num('a_fix');
+  const nP=aP*0.6,nK=num('n_kwh'),kw=num('n_peak')*4;
+  const kwR=Math.ceil(Math.round(kw*1e6)/1e6);
+  const lpM=Math.min(Math.max(kwR,2),10)*33+Math.max(kwR-10,0)*66;
+  $('kw').innerHTML='<span style="color:#d92d20">Spitzenleistung: '+kw.toLocaleString('de-AT',{maximumFractionDigits:2})+' kW (15-Min-Wert × 4)</span>, abgerechnet: '+Math.max(kwR,2)+' kW<br>Leistungsentgelt: '+eur(lpM)+' pro Jahr (33 € je kW, Minimum 2 kW; ab 10 kW 66 € je weiterem kW)<br>Arbeitspreis: '+nP.toLocaleString('de-AT',{maximumFractionDigits:3})+' Cent/kWh (40 % unter aktuell)';
+  const alt=aK*aP/100+aF;
+  const neu=nK*nP/100+lpM;
+  $('r_alt_m').textContent=eur(alt/12);$('r_neu_m').textContent=eur(neu/12);
+  $('r_verb').textContent=eur(nK*nP/100/12);$('r_spitz').textContent=eur(lpM/12);
+  const d=alt-neu;
+  const el=$('r_diff');
+  el.className='big '+(d>=0?'good':'bad');
+  $('r_label').textContent=d>=0?'Ersparnis pro Jahr':'Mehrkosten pro Jahr';
+  el.textContent=eur(Math.abs(d));
+  $('r_pct').textContent=alt>0?(Math.abs(d)/alt*100).toLocaleString('de-AT',{maximumFractionDigits:1})+' % '+(d>=0?'günstiger':'teurer')+' als aktuell':'';
+}
+$('n_peak').addEventListener('input',()=>{const v=$('n_peak').value;$('n_kw').value=v===''?'':+(num('n_peak')*4).toFixed(4)});
+$('n_kw').addEventListener('input',()=>{const v=$('n_kw').value;$('n_peak').value=v===''?'':+(num('n_kw')/4).toFixed(4)});
+document.querySelectorAll('input').forEach(i=>i.addEventListener('input',calc));
+calc();
+</script>
+</body>
+</html>
